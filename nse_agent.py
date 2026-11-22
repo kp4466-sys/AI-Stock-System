@@ -8,6 +8,8 @@ Env (optional, for email): EMAIL_USER, EMAIL_APP_PASSWORD, EMAIL_TO
 """
 import os, io, smtplib, datetime as dt
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import html as _html
 import numpy as np
 import pandas as pd
 import requests
@@ -176,14 +178,91 @@ def main():
             "Screening output only, not advice. Use stop-loss, size positions small, "
             "do not chase gap-ups. Verify before acting.")
     print(text)
-    send_email(f"NSE Top 5 - {today}", text)
+    send_email(f"NSE Top 5 - {today}", text, build_html(out, today))
 
 
-def send_email(subject, body):
+def _fmt(v, suffix="", dash="-"):
+    try:
+        if v is None or (isinstance(v, float) and np.isnan(v)):
+            return dash
+        return f"{v:g}{suffix}"
+    except Exception:
+        return str(v)
+
+
+def build_html(out, today):
+    """Banner + table style HTML email (inline CSS so Gmail/Outlook render it)."""
+    d = dt.date.fromisoformat(today).strftime("%A, %d %b %Y")
+    rows = ""
+    for i, r in enumerate(out.itertuples(index=False), 1):
+        name = _html.escape(str(r.sym).replace(".NS", ""))
+        sector = _html.escape(str(r.sector) if isinstance(r.sector, str) and r.sector else "-")
+        bg = "#ffffff" if i % 2 else "#f5f8fc"
+        sc = float(r.score)
+        badge = "#16a34a" if sc >= 70 else ("#d97706" if sc >= 55 else "#6b7280")
+        td = f"padding:12px 8px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:center;background:{bg};"
+        rows += (
+            f"<tr>"
+            f"<td style='{td}font-weight:bold;color:#0b3d91;'>{i}</td>"
+            f"<td style='{td}text-align:left;'>"
+            f"<a href='https://www.tradingview.com/chart/?symbol=NSE:{name}' "
+            f"style='color:#0b3d91;font-weight:bold;font-size:15px;text-decoration:none;'>{name}</a>"
+            f"<br><span style='color:#6b7280;font-size:11px;'>{sector}</span></td>"
+            f"<td style='{td}'><span style='background:{badge};color:#fff;padding:3px 9px;"
+            f"border-radius:10px;font-weight:bold;'>{_fmt(sc)}</span></td>"
+            f"<td style='{td}'>{_html.escape(str(r.entry_zone))}</td>"
+            f"<td style='{td}color:#b91c1c;font-weight:bold;'>{_fmt(r.stop_loss)}</td>"
+            f"<td style='{td}color:#15803d;font-weight:bold;'>{_fmt(r.target_1)}</td>"
+            f"<td style='{td}'>{_fmt(r.rsi)}</td>"
+            f"<td style='{td}'>{_fmt(r.vol_ratio, 'x')}</td>"
+            f"<td style='{td}'>{_fmt(r[7], '%')}</td>"
+            f"</tr>"
+        )
+    th = ("padding:10px 8px;font-size:11px;color:#ffffff;background:#0b3d91;"
+          "text-align:center;text-transform:uppercase;letter-spacing:.4px;")
+    heads = ["#", "Stock", "Score", "Entry Zone", "Stop Loss", "Target", "RSI", "Vol", "Hist Win"]
+    head_html = "".join(
+        f"<th style='{th}{'text-align:left;' if h == 'Stock' else ''}'>{h}</th>" for h in heads)
+    return f"""<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#eef2f7;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#eef2f7;padding:16px 0;"><tr><td align="center">
+<table width="680" cellpadding="0" cellspacing="0" style="max-width:680px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;">
+  <tr><td style="background:#0b3d91;padding:26px 22px;text-align:center;">
+      <div style="color:#fbbf24;font-size:12px;letter-spacing:2px;font-weight:bold;">DAILY SCREENER REPORT</div>
+      <div style="color:#ffffff;font-size:26px;font-weight:bold;margin:6px 0;">NSE Top 5 Stocks Shortlist</div>
+      <div style="color:#cbd5e1;font-size:13px;">{d} &nbsp;|&nbsp; Nifty 500 scan</div>
+  </td></tr>
+  <tr><td style="background:#fbbf24;padding:8px;text-align:center;font-size:12px;color:#1f2937;font-weight:bold;">
+      Trend + Volume + Fundamentals + Historical Pattern Score (out of 100)
+  </td></tr>
+  <tr><td style="padding:16px 10px;">
+    <div style="overflow-x:auto;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;min-width:560px;">
+      <tr>{head_html}</tr>
+      {rows}
+    </table></div>
+  </td></tr>
+  <tr><td style="padding:4px 22px 18px;font-size:12px;color:#374151;line-height:1.6;">
+      <b>How to use:</b> Enter only inside the entry zone (do not chase gap-ups), always place the stop-loss,
+      keep each stock at 15-20% of portfolio at most. Tap a stock name to open its chart.
+  </td></tr>
+  <tr><td style="background:#f3f4f6;padding:14px 22px;font-size:11px;color:#6b7280;text-align:center;line-height:1.5;">
+      Automated screening output for research only. Not investment advice. Past patterns do not guarantee future returns.
+      Verify before acting.
+  </td></tr>
+</table></td></tr></table>
+</body></html>"""
+
+
+def send_email(subject, body, html_body=None):
     u, p, to = (os.getenv(k) for k in ("EMAIL_USER", "EMAIL_APP_PASSWORD", "EMAIL_TO"))
     if not (u and p and to):
         return
-    m = MIMEText(body); m["Subject"], m["From"], m["To"] = subject, u, to
+    m = MIMEMultipart("alternative")
+    m["Subject"], m["From"], m["To"] = subject, u, to
+    m.attach(MIMEText(body, "plain"))
+    if html_body:
+        m.attach(MIMEText(html_body, "html"))
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
         s.login(u, p); s.send_message(m)
     print("Email sent.")
