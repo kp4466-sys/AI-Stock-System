@@ -276,11 +276,13 @@ def save_to_sheet(out, today):
 
     rows = []
     for r in out.itertuples(index=False):
-        rows.append([today, str(r.sym).replace(".NS", ""), clean(r.sector),
+        # Sheet order after Sr. No. (A) :
+        # B Date | C Stock | D Industries | E Score | F Entry Zone | G Stop Loss | H Target
+        # I RSI | J Volume | K Hist Win | L Hist Median % | M n
+        rows.append([today, str(r.sym).replace(".NS", ""), clean(r.sector), clean(r.score),
                      str(r.entry_zone), clean(r.stop_loss), clean(r.target_1),
-                     clean(r.rsi), clean(r.vol_ratio), clean(r[7]),   # r[7] = hist_win%
-                     clean(r.score),                       # Score -> column K
-                     clean(r[8]), clean(r[9])])            # Hist Median % -> L, n -> M
+                     clean(r.rsi), clean(r.vol_ratio),
+                     clean(r[7]), clean(r[8]), clean(r[9])])   # r[7]=hist_win%, r[8]=hist_median%, r[9]=n
     resp = requests.post(url, json={"token": token, "rows": rows}, timeout=60)
     print("Sheet response:", resp.text[:200])
 
