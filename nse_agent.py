@@ -203,6 +203,8 @@ def build_html(out, today):
         sector = _html.escape(str(r.sector) if isinstance(r.sector, str) and r.sector else "-")
         bg = "#ffffff" if i % 2 else "#f5f8fc"
         sc = float(r.score)
+        med_color = ('#15803d' if (isinstance(r[8], (int, float)) and not np.isnan(r[8]) and r[8] > 0)
+                     else ('#b91c1c' if (isinstance(r[8], (int, float)) and not np.isnan(r[8])) else '#6b7280'))
         badge = "#16a34a" if sc >= 70 else ("#d97706" if sc >= 55 else "#6b7280")
         td = f"padding:12px 8px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:center;background:{bg};"
         rows += (
@@ -220,17 +222,19 @@ def build_html(out, today):
             f"<td style='{td}'>{_fmt(r.rsi)}</td>"
             f"<td style='{td}'>{_fmt(r.vol_ratio, 'x')}</td>"
             f"<td style='{td}'>{_fmt(r[7], '%')}</td>"
+            f"<td style='{td}color:{med_color};font-weight:bold;'>{_fmt(r[8], '%')}</td>"
+            f"<td style='{td}color:#6b7280;'>{_fmt(r[9])}</td>"
             f"</tr>"
         )
     th = ("padding:10px 8px;font-size:11px;color:#ffffff;background:#0b3d91;"
           "text-align:center;text-transform:uppercase;letter-spacing:.4px;")
-    heads = ["#", "Stock", "Score", "Entry Zone", "Stop Loss", "Target", "RSI", "Vol", "Hist Win"]
+    heads = ["#", "Stock", "Score", "Entry Zone", "Stop Loss", "Target", "RSI", "Vol", "Hist Win", "Hist Median", "n"]
     head_html = "".join(
         f"<th style='{th}{'text-align:left;' if h == 'Stock' else ''}'>{h}</th>" for h in heads)
     return f"""<!DOCTYPE html>
 <html><body style="margin:0;padding:0;background:#eef2f7;font-family:Arial,Helvetica,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#eef2f7;padding:16px 0;"><tr><td align="center">
-<table width="680" cellpadding="0" cellspacing="0" style="max-width:680px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;">
+<table width="760" cellpadding="0" cellspacing="0" style="max-width:760px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;">
   <tr><td style="background:#0b3d91;padding:26px 22px;text-align:center;">
       <div style="color:#fbbf24;font-size:12px;letter-spacing:2px;font-weight:bold;">DAILY SCREENER REPORT</div>
       <div style="color:#ffffff;font-size:26px;font-weight:bold;margin:6px 0;">NSE Top 5 Stocks Shortlist</div>
@@ -241,7 +245,7 @@ def build_html(out, today):
   </td></tr>
   <tr><td style="padding:16px 10px;">
     <div style="overflow-x:auto;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;min-width:560px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;min-width:640px;">
       <tr>{head_html}</tr>
       {rows}
     </table></div>
@@ -275,7 +279,8 @@ def save_to_sheet(out, today):
         rows.append([today, str(r.sym).replace(".NS", ""), clean(r.sector),
                      str(r.entry_zone), clean(r.stop_loss), clean(r.target_1),
                      clean(r.rsi), clean(r.vol_ratio), clean(r[7]),   # r[7] = hist_win%
-                     clean(r.score)])                      # Score -> column K
+                     clean(r.score),                       # Score -> column K
+                     clean(r[8]), clean(r[9])])            # Hist Median % -> L, n -> M
     resp = requests.post(url, json={"token": token, "rows": rows}, timeout=60)
     print("Sheet response:", resp.text[:200])
 
