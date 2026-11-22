@@ -178,6 +178,10 @@ def main():
             "Screening output only, not advice. Use stop-loss, size positions small, "
             "do not chase gap-ups. Verify before acting.")
     print(text)
+    try:
+        save_to_sheet(out, today)
+    except Exception as e:
+        print("Sheet save failed (email will still be sent):", e)
     send_email(f"NSE Top 5 - {today}", text, build_html(out, today))
 
 
@@ -252,6 +256,27 @@ def build_html(out, today):
   </td></tr>
 </table></td></tr></table>
 </body></html>"""
+
+
+def save_to_sheet(out, today):
+    """Append today's Top 5 rows to Google Sheet through an Apps Script web app."""
+    url, token = os.getenv("SHEET_WEBHOOK_URL"), os.getenv("SHEET_TOKEN")
+    if not (url and token):
+        print("Sheet webhook not configured, skipping.")
+        return
+
+    def clean(v):
+        if v is None or (isinstance(v, float) and np.isnan(v)):
+            return ""
+        return v.item() if hasattr(v, "item") else v
+
+    rows = []
+    for r in out.itertuples(index=False):
+        rows.append([today, str(r.sym).replace(".NS", ""), clean(r.sector),
+                     str(r.entry_zone), clean(r.stop_loss), clean(r.target_1),
+                     clean(r.rsi), clean(r.vol_ratio), clean(r[7])])   # r[7] = hist_win%
+    resp = requests.post(url, json={"token": token, "rows": rows}, timeout=60)
+    print("Sheet response:", resp.text[:200])
 
 
 def send_email(subject, body, html_body=None):
