@@ -274,7 +274,8 @@ def save_to_sheet(out, today):
     for r in out.itertuples(index=False):
         rows.append([today, str(r.sym).replace(".NS", ""), clean(r.sector),
                      str(r.entry_zone), clean(r.stop_loss), clean(r.target_1),
-                     clean(r.rsi), clean(r.vol_ratio), clean(r[7])])   # r[7] = hist_win%
+                     clean(r.rsi), clean(r.vol_ratio), clean(r[7]),   # r[7] = hist_win%
+                     clean(r.score)])                      # Score -> column K
     resp = requests.post(url, json={"token": token, "rows": rows}, timeout=60)
     print("Sheet response:", resp.text[:200])
 
