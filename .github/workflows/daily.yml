@@ -1,8 +1,8 @@
 name: NSE Daily Agent
 on:
   schedule:
-    - cron: "0 13 * * 1-5"   # 6:30 PM IST, Mon-Fri
-  workflow_dispatch: {}       # manual "Run workflow" button
+    - cron: "0 13 * * 1-5"
+  workflow_dispatch: {}
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -16,5 +16,7 @@ jobs:
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          SHEET_WEBHOOK_URL: ${{ secrets.SHEET_WEBHOOK_URL }}
+          SHEET_TOKEN: ${{ secrets.SHEET_TOKEN }}
       - uses: actions/upload-artifact@v4
         with: { name: top5, path: "top5_*.csv" }
